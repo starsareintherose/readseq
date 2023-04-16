@@ -168,6 +168,7 @@ link -w -o readseq -t MPST -c 'MPS ' �
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ureadseq.h"

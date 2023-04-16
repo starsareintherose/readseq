@@ -18,6 +18,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define UREADSEQ_G
@@ -123,7 +124,7 @@ Local void readline(FILE *f, char *s, long *linestart)
 	}
 }
 
-Local void getline(struct ReadSeqVars *V)
+Local void cgetline(struct ReadSeqVars *V)
 {
 	readline(V->f, V->s, &V->linestart);
 }
@@ -200,7 +201,7 @@ Local void readLoop(short margin, boolean addfirst,
 
 	if (addfirst) addseq(V->s, V);
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 		V->done |= (*endTest)(&addend, &ungetend, V);
 		if (V->addit && (addend || !V->done) &&
@@ -231,7 +232,7 @@ Local void readIG(struct ReadSeqVars *V)
 
 	while (!V->allDone) {
 		do {
-			getline(V);
+			cgetline(V);
 			for (si = V->s; *si != 0 && *si < ' '; si++)
 				*si = ' ';	 /* drop controls */
 			if (*si == 0) *V->s = 0; /* chop line to empty */
@@ -257,13 +258,13 @@ Local void readStrider(struct ReadSeqVars *V)
 { /* ? only 1 seq/file ? */
 
 	while (!V->allDone) {
-		getline(V);
+		cgetline(V);
 		if (strstr(V->s, "; DNA sequence  ") == V->s)
 			strcpy(V->seqid, (V->s) + 16);
 		else
 			strcpy(V->seqid, (V->s) + 1);
 		while ((!feof(V->f)) && (*V->s == ';')) {
-			getline(V);
+			cgetline(V);
 		}
 		if (feof(V->f))
 			V->allDone = true;
@@ -285,17 +286,17 @@ Local void readPIR(struct ReadSeqVars *V)
 	while (!V->allDone) {
 		while (!(feof(V->f) || strstr(V->s, "ENTRY") ||
 			 strstr(V->s, "SEQUENCE")))
-			getline(V);
+			cgetline(V);
 		strcpy(V->seqid, (V->s) + 16);
 		while (!(feof(V->f) || strstr(V->s, "SEQUENCE") == V->s))
-			getline(V);
+			cgetline(V);
 		readLoop(0, false, endPIR, V);
 
 		if (!V->allDone) {
 			while (!(
 			    feof(V->f) ||
 			    ((*V->s != 0) && (strstr(V->s, "ENTRY") == V->s))))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -314,14 +315,14 @@ Local void readGenBank(struct ReadSeqVars *V)
 	while (!V->allDone) {
 		strcpy(V->seqid, (V->s) + 12);
 		while (!(feof(V->f) || strstr(V->s, "ORIGIN") == V->s))
-			getline(V);
+			cgetline(V);
 		readLoop(0, false, endGB, V);
 
 		if (!V->allDone) {
 			while (!(
 			    feof(V->f) ||
 			    ((*V->s != 0) && (strstr(V->s, "LOCUS") == V->s))))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -351,11 +352,11 @@ Local void readNBRF(struct ReadSeqVars *V)
 {
 	while (!V->allDone) {
 		strcpy(V->seqid, (V->s) + 4);
-		getline(V); /*skip title-junk line*/
+		cgetline(V); /*skip title-junk line*/
 		readLoop(0, false, endNBRF, V);
 		if (!V->allDone) {
 			while (!(feof(V->f) || (*V->s != 0 && *V->s == '>')))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -377,7 +378,7 @@ Local void readPearson(struct ReadSeqVars *V)
 		if (!V->allDone) {
 			while (
 			    !(feof(V->f) || ((*V->s != 0) && (*V->s == '>'))))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -395,7 +396,7 @@ Local void readEMBL(struct ReadSeqVars *V)
 	while (!V->allDone) {
 		strcpy(V->seqid, (V->s) + 5);
 		do {
-			getline(V);
+			cgetline(V);
 		} while (!(feof(V->f) | (strstr(V->s, "SQ   ") == V->s)));
 
 		readLoop(0, false, endEMBL, V);
@@ -403,7 +404,7 @@ Local void readEMBL(struct ReadSeqVars *V)
 			while (
 			    !(feof(V->f) | ((*V->s != '\0') &
 					    (strstr(V->s, "ID   ") == V->s))))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -422,13 +423,13 @@ Local void readZuker(struct ReadSeqVars *V)
 	/*! 1st string is Zuker's Fortran format */
 
 	while (!V->allDone) {
-		getline(V); /*s == "seqLen seqid string..."*/
+		cgetline(V); /*s == "seqLen seqid string..."*/
 		strcpy(V->seqid, (V->s) + 6);
 		readLoop(0, false, endZuker, V);
 		if (!V->allDone) {
 			while (
 			    !(feof(V->f) | ((*V->s != '\0') & (*V->s == '('))))
-				getline(V);
+				cgetline(V);
 		}
 		if (feof(V->f)) V->allDone = true;
 	}
@@ -471,7 +472,7 @@ Local void readPlain(struct ReadSeqVars *V)
 	do {
 		addseq(V->s, V);
 		V->done = feof(V->f);
-		getline(V);
+		cgetline(V);
 	} while (!V->done);
 	if (V->choice == kListSequences) addinfo(V->seqid, V);
 	V->allDone = true;
@@ -482,7 +483,7 @@ Local void readUWGCG(struct ReadSeqVars *V)
 	/*
 	10nov91: Reading GCG files casued duplication of last line when
 		 EOF followed that line !!!
-	    fix: getline now sets *V->s = 0
+	    fix: cgetline now sets *V->s = 0
 	*/
 	char *si;
 
@@ -498,7 +499,7 @@ Local void readUWGCG(struct ReadSeqVars *V)
 		*si = 0;
 	do {
 		V->done = feof(V->f);
-		getline(V);
+		cgetline(V);
 		if (!V->done) addseq((V->s), V);
 	} while (!V->done);
 	if (V->choice == kListSequences) addinfo(V->seqid, V);
@@ -517,7 +518,7 @@ Local void readOlsen(struct ReadSeqVars *V)
 	rewind(V->f);
 	V->nseq = 0;
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 
 		if (V->done && !(*V->s))
@@ -618,7 +619,7 @@ Local void readMSF(struct ReadSeqVars *V)
 	rewind(V->f);
 	V->nseq = 0;
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 
 		if (V->done && !(*V->s))
@@ -698,7 +699,7 @@ Local void readPAUPinterleaved(struct ReadSeqVars *V)
 	domatch = (V->matchchar > 0);
 
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 
 		if (V->done && !(*V->s))
@@ -798,7 +799,7 @@ Local void readPAUPsequential(struct ReadSeqVars *V)
 	/* rewind(V->f); V->nseq= 0;  << do in caller !*/
 	indata = true; /* call here after we find "matrix" */
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 
 		if (V->done && !(*V->s))
@@ -901,7 +902,7 @@ Local void readPhylipInterleaved(struct ReadSeqVars *V)
 	 * V->topseqlen); */
 
 	do {
-		getline(V);
+		cgetline(V);
 		V->done = feof(V->f);
 
 		if (V->done && !(*V->s)) break;
@@ -953,7 +954,7 @@ Local void readPhylipSequential(struct ReadSeqVars *V)
 	while (isdigit(*si)) si++;
 	skipwhitespace(si);
 	V->topseqlen = atol(si);
-	getline(V);
+	cgetline(V);
 	while (!V->allDone) {
 		V->seqlencount = 0;
 		strncpy(V->seqid, (V->s), 10);
@@ -982,10 +983,10 @@ Local void readSeqMain(struct ReadSeqVars *V, const long skiplines_,
 	if (V->f == NULL)
 		V->err = eFileNotFound;
 	else {
-		for (l = skiplines_; l > 0; l--) getline(V);
+		for (l = skiplines_; l > 0; l--) cgetline(V);
 
 		do {
-			getline(V);
+			cgetline(V);
 			for (l = strlen(V->s); (l > 0) && (V->s[l] == ' '); l--)
 				;
 		} while ((l == 0) && !feof(V->f));
@@ -1036,7 +1037,7 @@ Local void readSeqMain(struct ReadSeqVars *V, const long skiplines_,
 					/* rewind(V->f); V->nseq= 0; ?? assume
 					 * it is at top ?? skiplines ... */
 					while (!done) {
-						getline(V);
+						cgetline(V);
 						tolowerstr(V->s);
 						if (strstr(V->s, "matrix"))
 							done = true;
@@ -1086,7 +1087,7 @@ Local void readSeqMain(struct ReadSeqVars *V, const long skiplines_,
 
 				case kFitch:
 					strcpy(V->seqid, V->s);
-					getline(V);
+					cgetline(V);
 					readFitch(V);
 					break;
 
@@ -1095,7 +1096,7 @@ Local void readSeqMain(struct ReadSeqVars *V, const long skiplines_,
 						gotuw = (strstr(V->s, "..") !=
 							 NULL);
 						if (gotuw) readUWGCG(V);
-						getline(V);
+						cgetline(V);
 					} while (!(feof(V->f) || V->allDone));
 					break;
 			}
